@@ -3,6 +3,8 @@ import warnings
 import cv2
 import numpy as np
 import pytesseract
+from numpy import array
+
 from scipy import ndimage
 
 pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract.exe'
@@ -59,22 +61,28 @@ def matchSymbol(image, template):
             minVal = min_val
             results = (resized, result)
     return results
-# defektes meg
+# TODO
 def matchCharacter(image, template):
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    # csak a bal felso resze kell a kepnek!
-    resized = image_rgb[:image_rgb.shape[0] // 4, :image_rgb.shape[1] // 4]
-    resultCharacter = pytesseract.image_to_string(resized, config='--psm 10')
-    return resultCharacter
+    #image = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY)[1]
+    config = '--oem 3  --psm 10 -c tessedit_char_whitelist=AJKQ2345678910'
+
+    #image = cv2.GaussianBlur(image, (1,1), 0)
+    # TODO
+    # lehetne egy loopot csinalni, 6-8ig levagni a heightet ezalatt
+    # es remelhetoleg legfeljebb egyfajta eredmenyt adnak vissza, nem tobbfajtat
+    resized = image[:image.shape[0] // 8, :image.shape[1] // 4]
+    string = pytesseract.image_to_string(resized, config=config)
+    cv2.imshow('matchCharacter',resized)
+    return string
 
 def main():
     # read image
-    image = cv2.imread('input/card1.png')
+    image = cv2.imread('input/main_image_2.jpg')
     # rotate image to x degrees
     image = ndimage.rotate(image, 0)
 
     # Read the template in grayscale format.
-    template = cv2.imread('input/newtemplate2.jpg', 0)
+    template = cv2.imread('input/newtemplate1.jpg', 0)
     w, h = template.shape[::-1]
 
     cv2.imshow('Original', image)
@@ -83,7 +91,8 @@ def main():
     image_copy = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # scale the image and choose the best matching one
     resizedImage, result = matchSymbol(image_copy, template)
-    print(matchCharacter(image, template))
+    #match character
+    print(matchCharacter(image_copy, template))
 
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
 
@@ -100,9 +109,13 @@ def main():
     x2, y2 = (x1 + w, y1 + h)
     cv2.rectangle(resizedImage, (x1, y1), (x2, y2), (0, 0, 255), 2)
     cv2.imshow('Resized image', resizedImage)
+
+
+
     cv2.imshow('Template', template)
     ## Normalize the result for proper grayscale output visualization.
     cv2.normalize(resizedImage, result, 0, 1, cv2.NORM_MINMAX, -1)
+
     cv2.imshow('Detected point', result)
     cv2.waitKey(0)
     cv2.imwrite('outputs/image_result.jpg', resizedImage)
