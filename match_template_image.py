@@ -11,7 +11,8 @@ pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesserac
 
 warnings.filterwarnings('ignore')
 
-# TM_SQDIFF_NORMED metódus
+# opencv matchTemplate() metódus implementációja
+# TM_SQDIFF_NORMED metódus változata
 def match_template(image, template):
     # (W - w + 1 , H - h + 1)
     # W->image width  w->template width
@@ -37,10 +38,12 @@ def match_template(image, template):
     return result
 
 # multi scale symbol matching
-# 3 méretarányt kipróbál, minta szimbólumot illeszt,
+# 3 méretarányt kipróbál, minta szimbólumot / template-t illeszt,
 # a legjobban illeszkedőt választja
 def matchSymbol(image, template):
     minVal = 100
+    print("Trying different scales of the image. ")
+    print("The lower match value is the better")
     for scale in (12, 15, 17):
         # rescale, keep the ratio!
         (h, w) = image.shape[:2]
@@ -56,23 +59,24 @@ def matchSymbol(image, template):
         #result = cv2.matchTemplate(image_copy, template, cv2.TM_SQDIFF_NORMED)
         result = match_template(resized, template)  #### cv2.matchTemplate func. TM_SQDIFF_NORMED
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-        print(scale, min_val)
+
+        print("Image scale:",scale, "Match value:",min_val)
         if(min_val < minVal):
             minVal = min_val
             results = (resized, result)
     return results
-# TODO
-def matchCharacter(image, template):
-    #image = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY)[1]
-    config = '--oem 3  --psm 10 -c tessedit_char_whitelist=AJKQ2345678910'
 
+# match character
+# visszaadja a felismert karaktert (ha van), mely csakis a whitelist-ből származhat
+# pytesseract használata - OCR (Optical Character Recognition)
+def matchCharacter(image, template):
+    config = '--oem 3  --psm 10 -c tessedit_char_whitelist=AJKQ2345678910'
     #image = cv2.GaussianBlur(image, (1,1), 0)
-    # TODO
-    # lehetne egy loopot csinalni, 6-8ig levagni a heightet ezalatt
-    # es remelhetoleg legfeljebb egyfajta eredmenyt adnak vissza, nem tobbfajtat
-    resized = image[:image.shape[0] // 8, :image.shape[1] // 4]
+
+    resized = image[:int(image.shape[0] / 1.5) , :int(image.shape[1] / 1.5)]
     string = pytesseract.image_to_string(resized, config=config)
     cv2.imshow('matchCharacter',resized)
+
     return string
 
 def main():
@@ -82,17 +86,16 @@ def main():
     image = ndimage.rotate(image, 0)
 
     # Read the template in grayscale format.
-    template = cv2.imread('input/newtemplate1.jpg', 0)
+    template = cv2.imread('input/newtemplate2.jpg', 0)
     w, h = template.shape[::-1]
 
     cv2.imshow('Original', image)
 
     # convert the image to grayscale
     image_copy = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    # scale the image and choose the best matching one
+
+    ### symbol matching
     resizedImage, result = matchSymbol(image_copy, template)
-    #match character
-    print(matchCharacter(image_copy, template))
 
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
 
@@ -105,11 +108,19 @@ def main():
 
     # Top left x and y coordinates.
     x1, y1 = min_loc # SQDIFF-nel minLoc, mashol maxLoc
-    ## Bottom right x and y coordinates.
-    x2, y2 = (x1 + w, y1 + h)
-    cv2.rectangle(resizedImage, (x1, y1), (x2, y2), (0, 0, 255), 2)
-    cv2.imshow('Resized image', resizedImage)
+    # Bottom right x and y coordinates.
+    x2, y2 = (x1 + w, y1 + h) # w, h -> template width, height
 
+    ### match character
+    # lefedjük fehérrel a részt ahol a szimbólum van, igy nem hat a karakterfelismerésre
+    onlyCharacter = resizedImage.copy()
+    # lefedjük egy fehér telitett téglalappal
+    cv2.rectangle(onlyCharacter, (x1, y1), (x2, y2), (255, 255, 255), -1)
+    print(matchCharacter(onlyCharacter, template))
+
+    ### show the box where the symbol is detected
+    cv2.rectangle(resizedImage, (x1, y1), (x2, y2), (0, 0, 255), 2)
+    cv2.imshow('Symbol location', resizedImage)
 
 
     cv2.imshow('Template', template)
