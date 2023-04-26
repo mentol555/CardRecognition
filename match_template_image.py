@@ -40,11 +40,12 @@ def match_template(image, template):
 # multi scale symbol matching
 # 3 méretarányt kipróbál, minta szimbólumot / template-t illeszt,
 # a legjobban illeszkedőt választja
+# TODO: piros szin keresese. -> ket opcio nyilik: vagy piros(sziv rombusz) vagy fekete()
 def matchSymbol(image, template):
     minVal = 100
     print("Trying different scales of the image. ")
     print("The lower match value is the better")
-    for scale in (12, 15, 17):
+    for scale in (12, 14, 17):
         # rescale, keep the ratio!
         (h, w) = image.shape[:2]
         height = template.shape[0] * scale
@@ -54,7 +55,7 @@ def matchSymbol(image, template):
         # resize image
         rescaled = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
         # csak a bal felso resze kell a kepnek!
-        resized = rescaled[:rescaled.shape[0] // 4, :rescaled.shape[1] // 4]
+        resized = rescaled[:int(image.shape[0] / 4) , :int(image.shape[1] / 4)]
 
         #result = cv2.matchTemplate(image_copy, template, cv2.TM_SQDIFF_NORMED)
         result = match_template(resized, template)  #### cv2.matchTemplate func. TM_SQDIFF_NORMED
@@ -70,26 +71,49 @@ def matchSymbol(image, template):
 # visszaadja a felismert karaktert (ha van), mely csakis a whitelist-ből származhat
 # pytesseract használata - OCR (Optical Character Recognition)
 def matchCharacter(image, template):
-    config = '--oem 3  --psm 10 -c tessedit_char_whitelist=AJKQ2345678910'
+    config = '--oem 3  --psm 10 -c tessedit_char_whitelist=AJKQ0123456789iILl'
     #image = cv2.GaussianBlur(image, (1,1), 0)
-
     resized = image[:int(image.shape[0] / 1.5) , :int(image.shape[1] / 1.5)]
     string = pytesseract.image_to_string(resized, config=config)
     cv2.imshow('matchCharacter',resized)
-
+    # bug: 10-es kártyánál csak a 0-át veszi észre
+    # De mivel csak a 10-esben van, ezért tudjuk, hogy a 10-es ről van szó
+    string = string.strip()
+    if(string == "0"):
+        string = "10"
     return string
+
+def resizeImage(image, height):
+    (h, w) = image.shape[:2]
+    r = height / float(h)
+    width = int(w * r)
+    dim = (width, height)
+    # resize image
+    resized = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+    return resized
+
+def adjustContrastBrightness(img, contrast, brightness):
+    adjusted = cv2.convertScaleAbs(img, alpha=contrast, beta=brightness)
+    return adjusted
 
 def main():
     # read image
-    image = cv2.imread('input/main_image_2.jpg')
+    original = cv2.imread('input/img5.jpg')
+    # resize image, height to be 500
+    # szelesseg is aranyosan valtozik
+    original = resizeImage(original, 500)
+    cv2.imshow('Original', original)
+    # adjust contrast, brightness
+    image = original.copy()
+    image = adjustContrastBrightness(image, 1.0, 5)
+    cv2.imshow('Adjusted', image)
     # rotate image to x degrees
-    image = ndimage.rotate(image, 0)
+    #image = ndimage.rotate(image, 0)
 
     # Read the template in grayscale format.
-    template = cv2.imread('input/newtemplate2.jpg', 0)
+    template = cv2.imread('input/newtemplate4.jpg', 0)
     w, h = template.shape[::-1]
 
-    cv2.imshow('Original', image)
 
     # convert the image to grayscale
     image_copy = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
