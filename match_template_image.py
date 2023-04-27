@@ -5,7 +5,7 @@ import numpy as np
 import pytesseract
 from numpy import array
 
-from scipy import ndimage
+#from scipy import ndimage
 
 pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract.exe'
 
@@ -96,9 +96,38 @@ def adjustContrastBrightness(img, contrast, brightness):
     adjusted = cv2.convertScaleAbs(img, alpha=contrast, beta=brightness)
     return adjusted
 
+# a kartya bal felso sarkat nezzuk (1/8-adat)
+# ha itt talal pirosat, akkor szinte biztos hogy piros
+# kulonben feketenek fogja elkonyvelni
+def checkColor(img):
+    resized = resizeImage(img, 500)
+    cropped = resized[:int(resized.shape[0] / 8), :int(resized.shape[1] / 8)]
+    img_hsv = cv2.cvtColor(cropped, cv2.COLOR_BGR2HSV)
+
+    ## Gen lower mask (0-5) and upper mask (175-180) of RED
+    mask1 = cv2.inRange(img_hsv, (0, 50, 20), (5, 255, 255))
+    mask2 = cv2.inRange(img_hsv, (175, 50, 20), (180, 255, 255))
+
+    ## Merge the mask and crop the red regions
+    mask = cv2.bitwise_or(mask1, mask2)
+    red_regions = cv2.bitwise_and(cropped, cropped, mask=mask)
+    #print(set(red_regions.flatten()))
+    ## Display
+    #cv2.imshow("mask", mask)
+    #cv2.imshow("red_regions", red_regions)
+    #cv2.imshow("cropped", cropped)
+    if (len(set(red_regions.flatten())) > 5):
+        color = "red"
+    else:
+        color = "black"
+    return color
+
 def main():
     # read image
-    original = cv2.imread('input/img5.jpg')
+    original = cv2.imread('input/img2.jpg')
+    # Kartya szinenek meghatarozasa: piros / fekete
+    print(checkColor(original))
+    
     # resize image, height to be 500
     # szelesseg is aranyosan valtozik
     original = resizeImage(original, 500)
